@@ -82,3 +82,7 @@ python server.py            # then open http://localhost:8000
 `ALPACA_LIVE` stays `0`. Nothing in this repository trades real money.
 
 ![Risk report](docs/img/risk-report.png)
+
+## License
+
+MIT (see [LICENSE](LICENSE)). The code is free to use and build on; nothing here is investment advice.
