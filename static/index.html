@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JB Capital — AI Hedge Fund</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root {
+    --bg:#070a12; --bg2:#0b101c; --card:#0f1522; --card2:#141c2c; --border:#1e2840; --border2:#2a3654;
+    --text:#e6ebf5; --muted:#8692ab; --faint:#5b6684; --accent:#7c8cff; --accent2:#22d3ee;
+    --green:#22c55e; --red:#f43f5e; --amber:#f59e0b; --violet:#a78bfa; --r:14px;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:radial-gradient(1200px 600px at 70% -10%, #18204a 0%, transparent 60%), var(--bg); color:var(--text);
+    font-family:Inter, system-ui, sans-serif; font-size:14px; -webkit-font-smoothing:antialiased; }
+  .mono { font-family:'JetBrains Mono', monospace; }
+  .up { color:var(--green); } .down { color:var(--red); } .muted { color:var(--muted); } .faint { color:var(--faint); }
+
+  /* top bar */
+  .top { display:flex; align-items:center; gap:18px; padding:14px 20px; border-bottom:1px solid var(--border); background:rgba(7,10,18,.75); backdrop-filter:blur(10px); position:sticky; top:0; z-index:5; flex-wrap:wrap; }
+  .brand { display:flex; align-items:center; gap:12px; margin-right:6px; }
+  .mark { width:36px; height:36px; border-radius:10px; background:conic-gradient(from 200deg, var(--accent), var(--accent2), var(--violet), var(--accent)); box-shadow:0 0 24px rgba(124,140,255,.45); display:grid; place-items:center; font-weight:700; color:#0b1020; }
+  .fund { font-weight:700; letter-spacing:.2px; font-size:15px; }
+  .sub { color:var(--muted); font-size:12px; }
+  .kpis { display:flex; gap:8px; flex-wrap:wrap; flex:1; }
+  .kpi { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:7px 11px; min-width:92px; }
+  .kpi b { display:block; font-size:10.5px; letter-spacing:.6px; text-transform:uppercase; color:var(--faint); font-weight:600; }
+  .kpi span { font-family:'JetBrains Mono', monospace; font-size:16px; font-weight:600; }
+  .live { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--red); }
+  .dot.on { background:var(--green); box-shadow:0 0 10px var(--green); animation:pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity:.4; } }
+  .pill { font-size:11px; padding:3px 8px; border-radius:99px; border:1px solid var(--border2); color:var(--muted); white-space:nowrap; }
+  .pill.ok { color:var(--green); border-color:rgba(34,197,94,.4); background:rgba(34,197,94,.08); }
+  .pill.ai { color:var(--accent); border-color:rgba(124,140,255,.45); background:rgba(124,140,255,.1); }
+
+  /* layout */
+  .grid { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:14px; padding:14px 20px 20px; }
+  .card { background:linear-gradient(180deg, var(--card), var(--bg2)); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
+  .card h3 { margin:0; font-size:12px; letter-spacing:.7px; text-transform:uppercase; color:var(--muted); font-weight:600; }
+  .head { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); gap:8px; }
+  .body { padding:12px 14px; }
+
+  #stage { position:relative; height:min(66vh, 720px); min-height:440px; }
+  #stage canvas:not(#minimap) { display:block; width:100%; height:100%; }
+  #overlay { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .toolbar { position:absolute; top:12px; left:12px; right:12px; display:flex; gap:6px; flex-wrap:wrap; z-index:4; pointer-events:none; }
+  .toolbar > * { pointer-events:auto; }
+  .menu { position:relative; }
+  .menu-list { display:none; position:absolute; top:calc(100% + 6px); left:0; min-width:230px; background:rgba(11,16,28,.97); border:1px solid var(--border2); border-radius:12px; padding:6px; box-shadow:0 12px 40px rgba(0,0,0,.5); }
+  .menu.open .menu-list { display:block; }
+  .menu-list .mh { font-size:10.5px; letter-spacing:.6px; text-transform:uppercase; color:var(--faint); padding:8px 10px 4px; font-weight:600; }
+  .mi { display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%; background:none; border:0; color:var(--text); font:500 13px Inter, sans-serif; padding:7px 10px; border-radius:8px; cursor:pointer; text-align:left; }
+  .mi:hover, .mi:focus-visible { background:var(--card2); outline:none; }
+  kbd { font:600 10.5px 'JetBrains Mono', monospace; color:var(--muted); border:1px solid var(--border2); border-radius:5px; padding:1px 5px; background:var(--bg2); }
+  /* game mode: the 3D floor takes the whole window */
+  .gonly { display:none !important; }
+  body.game { overflow:hidden; }
+  body.game .gonly { display:flex !important; }
+  body.game .top, body.game .lower, body.game .grid > .card:last-child, body.game #hint { display:none; }
+  body.game .grid { display:block; padding:0; }
+  body.game .grid > .card:first-child { border:0; border-radius:0; }
+  body.game #stage { position:fixed; inset:0; height:100vh; min-height:0; z-index:8; }
+  #gKpi { position:absolute; top:12px; right:12px; z-index:3; gap:14px; align-items:center; background:rgba(11,16,28,.86); border:1px solid var(--border2); border-radius:12px; padding:8px 14px; font-size:12px; color:var(--muted); backdrop-filter:blur(6px); }
+  #gKpi b { font:600 14px 'JetBrains Mono', monospace; color:var(--text); margin-left:5px; }
+  #gFeed { position:absolute; top:108px; right:12px; width:min(340px, 30vw); z-index:3; flex-direction:column; gap:6px; pointer-events:none; }
+  /* walk mode */
+  .label.you { background:#facc15; color:#1a1405; border-color:#facc15; font-weight:800; letter-spacing:.5px; }
+  #gPrompt { position:absolute; left:50%; bottom:58px; transform:translateX(-50%); z-index:5; display:none; align-items:center; gap:8px; background:rgba(11,16,28,.92); border:1px solid #facc15; color:#fff; border-radius:999px; padding:7px 14px 7px 8px; font:600 13px Inter, sans-serif; box-shadow:0 6px 24px rgba(0,0,0,.45); cursor:pointer; white-space:nowrap; }
+  #gPrompt.on { display:flex; }
+  #gPrompt kbd { background:#facc15; color:#1a1405; border-color:#facc15; font-size:12px; padding:2px 7px; }
+  body.game #gPrompt { bottom:86px; }
+  #gRoundsBox { position:absolute; top:62px; right:12px; z-index:4; flex-direction:column; align-items:flex-end; gap:6px; }
+  #gRounds { font:600 12px Inter, sans-serif; color:var(--text); background:rgba(11,16,28,.86); border:1px solid var(--border2); border-radius:999px; padding:6px 12px; cursor:pointer; display:flex; gap:8px; align-items:center; }
+  #gRounds .bar { width:70px; height:5px; margin:0; }
+  #gRounds.done { border-color:#facc15; }
+  #gRoundsList { width:250px; background:rgba(11,16,28,.95); border:1px solid var(--border2); border-radius:12px; padding:8px 10px; font-size:12.5px; }
+  #gRoundsList[hidden] { display:none; }
+  #gRoundsList div { padding:3px 0; color:var(--muted); } #gRoundsList div.ok { color:var(--text); } #gRoundsList div.ok b { color:#22c55e; }
+  #gToasts { position:absolute; top:64px; left:50%; transform:translateX(-50%); z-index:6; display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; }
+  #gToasts div { background:rgba(11,16,28,.94); border:1px solid #facc15; color:#fff; border-radius:999px; padding:7px 16px; font:600 13px Inter, sans-serif; box-shadow:0 8px 28px rgba(0,0,0,.45); transition:opacity .5s, transform .5s; }
+  #gToasts div.big { font-size:15px; padding:10px 20px; background:linear-gradient(90deg, #3b2f05, #1a1405); }
+  #fade { position:fixed; inset:0; background:#000; opacity:0; pointer-events:none; z-index:60; transition:opacity .28s; }
+  #fade.on { opacity:1; }
+  #travel { position:absolute; left:50%; bottom:130px; transform:translateX(-50%); z-index:7; background:rgba(11,16,28,.96); border:1px solid #facc15; border-radius:14px; padding:10px; display:grid; grid-template-columns:repeat(2, minmax(130px, 1fr)); gap:6px; box-shadow:0 12px 40px rgba(0,0,0,.55); }
+  #travel[hidden] { display:none; }
+  #travel h4 { grid-column:1 / -1; margin:2px 4px 4px; font:700 12px Inter, sans-serif; letter-spacing:.5px; color:#facc15; text-transform:uppercase; }
+  #travel button { text-align:left; }
+  .panelhead { display:none; }
+  body.game.panel .grid > .card:last-child { display:block; position:fixed; right:12px; top:108px; width:min(420px, calc(100vw - 24px)); z-index:20; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+  body.game.panel .panelhead { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid var(--border); font-size:12px; color:var(--muted); }
+  body.game.panel .pane { height:calc(100vh - 250px); min-height:200px; }
+  body.game.panel #gFeed { display:none !important; }
+  #gFeed div { background:rgba(11,16,28,.84); border:1px solid var(--border); border-radius:10px; padding:7px 10px; font-size:12.5px; line-height:1.35; transition:opacity .6s; }
+  #gFeed .who { font-weight:700; margin-right:5px; }
+  #gStrip { position:absolute; left:50%; transform:translateX(-50%); bottom:12px; z-index:3; max-width:calc(100% - 560px); min-width:200px; gap:6px; overflow-x:auto; padding:6px; background:rgba(11,16,28,.84); border:1px solid var(--border2); border-radius:14px; backdrop-filter:blur(6px); scrollbar-width:thin; }
+  .chip { display:flex; flex-direction:column; align-items:flex-start; flex:0 0 auto; min-width:86px; padding:6px 9px; border-radius:10px; border:1px solid var(--border); background:var(--bg2); color:var(--text); cursor:pointer; font:600 12px Inter, sans-serif; }
+  .chip:hover { border-color:var(--accent); }
+  .chip.on { border-color:var(--accent); background:rgba(124,140,255,.18); }
+  .chip i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+  .chip small { font:500 10.5px Inter, sans-serif; color:var(--muted); margin-top:2px; white-space:nowrap; }
+  #gCard { position:absolute; left:12px; top:64px; width:300px; z-index:3; display:none; background:rgba(11,16,28,.93); border:1px solid var(--border2); border-radius:14px; padding:12px 14px; backdrop-filter:blur(8px); font-size:12.5px; max-height:calc(100% - 250px); overflow:auto; }
+  body.game #gCard.on { display:block; }
+  /* the city tour: letterbox bars + a big caption, everything else out of the way */
+  #tourCap { position:absolute; left:0; right:0; bottom:9%; z-index:9; text-align:center; pointer-events:none; opacity:0; transform:translateY(10px); transition:opacity .7s, transform .7s; }
+  #tourCap.on { opacity:1; transform:none; }
+  #tourT { font:800 clamp(28px, 5vw, 56px) Inter, sans-serif; letter-spacing:-.5px; color:#fff; text-shadow:0 4px 24px rgba(0,0,0,.7); }
+  #tourS { font:500 clamp(14px, 1.8vw, 20px) Inter, sans-serif; color:#dbe3f4; margin-top:6px; text-shadow:0 2px 12px rgba(0,0,0,.8); }
+  .tourHint { font:500 11px Inter, sans-serif; color:rgba(255,255,255,.45); margin-top:14px; }
+  body.touring #stage::before, body.touring #stage::after { content:''; position:absolute; left:0; right:0; height:9vh; background:#000; z-index:8; pointer-events:none; }
+  body.touring #stage::before { top:0; } body.touring #stage::after { bottom:0; }
+  body.touring .toolbar, body.touring #gKpi, body.touring #gFeed, body.touring #gStrip, body.touring #gCard, body.touring #navpad, body.touring #compass,
+  body.touring #minimap, body.touring #gRoundsBox, body.touring #gPrompt, body.touring #overlay, body.touring #gToasts { display:none !important; }
+  @media print { body * { visibility:hidden !important; } #modal, #modal * { visibility:visible !important; }
+    #modal { position:absolute; inset:0; background:#fff; display:block !important; } #modal .win { width:100%; max-height:none; box-shadow:none; border:0; } }
+  #help { position:absolute; inset:0; z-index:15; display:flex; align-items:center; justify-content:center; background:rgba(3,5,10,.6); }
+  #help[hidden] { display:none; }
+  #help .win { width:min(600px, 94%); max-height:92%; overflow:auto; background:var(--card); border:1px solid var(--border2); border-radius:16px; padding:16px 18px; box-shadow:0 24px 80px rgba(0,0,0,.6); }
+  #help h2 { margin:0 0 4px; font-size:15px; } #help h4 { margin:12px 0 4px; font-size:11px; letter-spacing:.6px; text-transform:uppercase; color:var(--faint); }
+  #help td { font-family:Inter, sans-serif; font-size:12.5px; padding:5px 8px; } #help td:first-child { white-space:nowrap; color:var(--text); font-weight:600; width:38%; }
+  @media (max-width: 900px) { #gStrip { max-width:calc(100% - 24px); bottom:66px; } #gFeed { display:none !important; } #gCard { width:calc(100% - 24px); top:auto; bottom:140px; max-height:40%; } }
+  .btn { font:500 12px Inter, sans-serif; background:rgba(15,21,34,.85); color:var(--text); border:1px solid var(--border2); border-radius:9px; padding:7px 11px; cursor:pointer; backdrop-filter:blur(6px); }
+  .btn:hover { border-color:var(--accent); color:#fff; }
+  .btn.on { background:var(--accent); border-color:var(--accent); color:#0b1020; }
+  .btn.sm { padding:4px 8px; font-size:11px; }
+  .btn.danger:hover { border-color:var(--red); color:var(--red); }
+  #hint { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); font-size:12px; color:var(--muted); background:rgba(7,10,18,.7); padding:4px 6px 4px 10px; border-radius:8px; z-index:2; display:flex; align-items:center; gap:6px; max-width:calc(100% - 420px); }
+  #hint button { background:none; border:0; color:var(--muted); font-size:15px; cursor:pointer; padding:0 4px; line-height:1; }
+  #hint button:hover { color:#fff; }
+  #navpad { position:absolute; left:12px; bottom:12px; z-index:2; display:grid; grid-template-columns:repeat(3, 38px); gap:4px; user-select:none; touch-action:none; }
+  #navpad button { width:38px; height:38px; border-radius:10px; border:1px solid var(--border2); background:rgba(15,21,34,.85); color:var(--text); font-size:15px; cursor:pointer; backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:0; }
+  #navpad button:hover { border-color:var(--accent); color:#fff; }
+  #navpad button.held { background:var(--accent); color:#0b1020; border-color:var(--accent); }
+  #compass { position:absolute; left:142px; bottom:12px; z-index:2; width:38px; height:38px; border-radius:50%; border:1px solid var(--border2); background:rgba(15,21,34,.85); color:#f87171; font:800 12px Inter, sans-serif; cursor:pointer; padding:0; }
+  #compass span { display:inline-block; transition:transform .1s linear; }
+  #minimap { position:absolute; right:12px; bottom:12px; z-index:2; width:220px; height:120px; border-radius:10px; border:1px solid var(--border2); background:rgba(7,10,18,.8); cursor:crosshair; }
+  @media (max-width: 760px) { #minimap { width:150px; height:82px; } #hint { display:none; } #navpad { grid-template-columns:repeat(3, 44px); } #navpad button { width:44px; height:44px; } #compass { left:162px; } }
+  #tip { position:absolute; z-index:3; pointer-events:none; font-size:12px; background:#0b1020; border:1px solid var(--border2); color:var(--text); padding:5px 8px; border-radius:8px; display:none; }
+  .label { position:absolute; transform:translate(-50%,-100%); font-size:11px; font-weight:600; padding:3px 8px; border-radius:99px; background:rgba(11,16,32,.85); border:1px solid var(--border2); color:#fff; white-space:nowrap; }
+  .label.sel { background:var(--accent); color:#0b1020; border-color:var(--accent); }
+  .annBanner { position:fixed; left:50%; top:70px; transform:translate(-50%,-30px); opacity:0; z-index:65; max-width:min(720px,92vw); text-align:center;
+    background:linear-gradient(135deg,rgba(17,24,39,.97),rgba(30,27,75,.97)); border:2px solid #facc15; border-radius:16px; padding:14px 22px; box-shadow:0 20px 60px rgba(0,0,0,.6);
+    transition:transform .5s cubic-bezier(.2,1.3,.4,1), opacity .4s; pointer-events:none; }
+  .annBanner.on { transform:translate(-50%,0); opacity:1; }
+  .annBanner .who { font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#facc15; font-weight:800; }
+  .annBanner .txt { font-size:20px; font-weight:800; color:#fff; margin-top:4px; line-height:1.3; }
+  .annBanner .dirs { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-top:8px; } .annBanner .dirs span { font-size:11.5px; background:rgba(250,204,21,.15); color:#fde68a; padding:3px 8px; border-radius:999px; }
+  .tchip { font-size:10.5px; padding:1px 7px; border-radius:999px; border:1px solid var(--border2); margin-left:4px; text-transform:uppercase; letter-spacing:.4px; }
+  .achToast { position:fixed; left:50%; top:18px; transform:translate(-50%,-140%); z-index:70; display:flex; gap:12px; align-items:center; background:linear-gradient(135deg,#1f1a07,#111827);
+    border:2px solid #facc15; border-radius:14px; padding:10px 16px; box-shadow:0 16px 50px rgba(0,0,0,.6); transition:transform .45s cubic-bezier(.2,1.4,.4,1); min-width:260px; }
+  .achToast.on { transform:translate(-50%,0); }
+  .achToast .ic { font-size:30px; } .achToast .t { font-size:10.5px; letter-spacing:.8px; text-transform:uppercase; color:#facc15; font-weight:800; }
+  .achToast .n { font-size:15px; font-weight:800; color:#fff; } .achToast .d { font-size:12px; color:#cbd5e1; }
+  .bubble.big { max-width:360px; font-size:13px; z-index:2; border:2px solid #facc15; }
+  .bubble { position:absolute; transform:translate(-50%,-100%); max-width:260px; background:rgba(250,251,255,.97); color:#111827; padding:7px 10px; font-size:12.5px; line-height:1.35; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.35); }
+  .bubble:after { content:''; position:absolute; left:50%; bottom:-7px; margin-left:-7px; border:7px solid transparent; border-bottom:0; border-top-color:rgba(250,251,255,.97); }
+  .bubble .who { font-weight:700; font-size:11px; display:block; margin-bottom:1px; }
+  .stamp { position:absolute; transform:translate(-50%,-50%); font-weight:800; font-size:15px; letter-spacing:1px; padding:6px 12px; border-radius:10px; border:2px solid; background:rgba(7,10,18,.85); animation:stamp 2.4s forwards; }
+  .stamp.ok { color:var(--green); border-color:var(--green); } .stamp.no { color:var(--red); border-color:var(--red); }
+  @keyframes stamp { 0%{opacity:0; transform:translate(-50%,-50%) scale(2.2);} 10%{opacity:1; transform:translate(-50%,-50%) scale(1);} 80%{opacity:1} 100%{opacity:0} }
+  .floater { position:absolute; transform:translate(-50%,-50%); font-family:'JetBrains Mono', monospace; font-weight:700; font-size:16px; text-shadow:0 2px 8px #000; animation:floatup 2.4s forwards; }
+  @keyframes floatup { from{opacity:1; margin-top:0} to{opacity:0; margin-top:-70px} }
+
+  /* side panel */
+  .tabs { display:flex; gap:2px; padding:6px; border-bottom:1px solid var(--border); background:var(--bg2); flex-wrap:wrap; }
+  .tab { flex:1 0 auto; text-align:center; font-size:11.5px; font-weight:500; color:var(--muted); padding:7px 5px; border-radius:8px; cursor:pointer; }
+  .tab.on { background:var(--card2); color:#fff; box-shadow:inset 0 0 0 1px var(--border2); }
+  .pane { display:none; height:min(66vh, 720px); min-height:390px; overflow-y:auto; padding:12px 14px; }
+  .pane.on { display:block; }
+  .feed div { padding:7px 0; border-bottom:1px solid var(--border); font-size:13px; line-height:1.4; }
+  .feed .who { font-weight:600; font-size:12px; margin-right:4px; }
+  .feed .tm { color:var(--faint); font-size:11px; margin-right:6px; font-family:'JetBrains Mono', monospace; }
+  .pod { border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:10px; background:var(--bg2); }
+  .pod .row1 { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+  .pod .nm { font-weight:600; }
+  .bar { height:6px; background:var(--border); border-radius:99px; overflow:hidden; margin:6px 0 2px; }
+  .bar i { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg, var(--accent), var(--accent2)); }
+  .stat-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:6px; font-size:12px; }
+  .stat-grid div b { display:block; font-size:10px; color:var(--faint); font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+  .tag { font-size:10.5px; padding:2px 7px; border-radius:99px; border:1px solid var(--border2); color:var(--muted); }
+  .tag.active { color:var(--green); border-color:rgba(34,197,94,.4); } .tag.paused { color:var(--amber); border-color:rgba(245,158,11,.4); } .tag.stopped { color:var(--red); border-color:rgba(244,63,94,.4); }
+  .gauge { margin:8px 0 14px; } .gauge .l { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); }
+  .letter { border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; background:var(--bg2); }
+  .letter h4 { margin:0 0 4px; font-size:14px; } .letter p { margin:8px 0 0; color:#c9d1e4; line-height:1.55; white-space:pre-wrap; font-size:13px; }
+  .rlog { border-left:3px solid var(--border2); padding:6px 10px; margin-bottom:8px; background:var(--bg2); border-radius:0 10px 10px 0; font-size:12.5px; }
+  .rlog.pass { border-color:var(--green); } .rlog.fail { border-color:var(--red); }
+
+  .lower { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:14px; padding:0 20px 24px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th { text-align:left; color:var(--faint); font-weight:600; font-size:10.5px; letter-spacing:.5px; text-transform:uppercase; padding:6px 8px; border-bottom:1px solid var(--border); }
+  td { padding:7px 8px; border-bottom:1px solid var(--border); font-family:'JetBrains Mono', monospace; font-size:12px; }
+  td.t { font-family:Inter, sans-serif; }
+  #navChart, #candles { width:100%; height:240px; }
+
+  #modal { position:fixed; inset:0; background:rgba(3,5,10,.65); backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; z-index:20; }
+  #modal .win { width:min(760px,94vw); max-height:88vh; overflow:auto; background:var(--card); border:1px solid var(--border2); border-radius:16px; box-shadow:0 24px 80px rgba(0,0,0,.6); }
+  #modal .mh { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); }
+  #modal .mh h2 { margin:0; font-size:15px; } #modal .mb { padding:14px 16px; }
+  .srow { display:grid; grid-template-columns:180px 1fr 70px; gap:10px; align-items:center; margin:12px 0; }
+  input[type=range] { width:100%; accent-color:var(--accent); }
+  .symtabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  @media (max-width:1100px) { .grid, .lower { grid-template-columns:1fr; } .pane { height:420px; } }
+  /* phones: one scrolling toolbar row, HUD pills under it, strip / prompt / cards stacked above the nav pad + mini-map */
+  @media (max-width: 700px) {
+    .toolbar { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+    .toolbar::-webkit-scrollbar { display:none; }
+    .toolbar .btn { padding:6px 9px; font-size:11.5px; white-space:nowrap; flex:0 0 auto; }
+    .menu-list { position:fixed; top:50px; left:12px; max-height:70vh; overflow:auto; z-index:20; }
+    #gKpi { top:50px; right:auto; left:12px; gap:10px; padding:5px 10px; font-size:11px; }
+    #gKpi b { font-size:12.5px; }
+    #gRoundsBox { top:88px; }
+    #gStrip { bottom:156px; max-width:calc(100% - 24px); min-width:0; }
+    body.game #gPrompt { bottom:224px; }
+    #gCard { width:calc(100% - 24px); top:auto; bottom:224px; max-height:34%; }
+    #travel { bottom:224px; width:calc(100% - 24px); grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand"><div class="mark">JB</div><div><div class="fund">JB Capital</div><div class="sub">AI multi-strategy fund · equities, futures, crypto &amp; options · paper</div></div></div>
+  <div class="kpis">
+    <div class="kpi"><b>NAV / unit</b><span id="kNav">—</span></div>
+    <div class="kpi"><b>AUM</b><span id="kAum">—</span></div>
+    <div class="kpi"><b>Today</b><span id="kDay">—</span></div>
+    <div class="kpi"><b>Since inception</b><span id="kTot">—</span></div>
+    <div class="kpi"><b>Sharpe</b><span id="kSharpe">—</span></div>
+    <div class="kpi"><b>Max DD</b><span id="kDD">—</span></div>
+    <div class="kpi"><b>Gross / Net</b><span id="kExp">—</span></div>
+  </div>
+  <div id="mkts" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+  <div class="live"><span class="dot" id="liveDot"></span><span id="conn">offline</span></div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div id="stage">
+      <div class="toolbar">
+        <div class="menu" id="goMenu"><button class="btn" id="bGo" aria-haspopup="true" aria-expanded="false">Go to &#9662;</button>
+          <div class="menu-list" role="menu">
+            <button class="mi" id="bTour">&#9654; City tour (cinematic)</button>
+            <div class="mh">Inside JB Capital</div>
+            <button class="mi" data-go="floor">Trading floor <kbd>1</kbd></button>
+            <button class="mi" data-go="pms">Portfolio managers</button>
+            <button class="mi" data-go="wall">Video wall</button>
+            <button class="mi" data-go="office">Your office</button>
+            <button class="mi" data-go="cio">CIO office</button>
+            <button class="mi" data-go="lab">Quant research lab</button>
+            <button class="mi" data-go="conf">Conference room</button>
+            <button class="mi" data-go="lounge">Lounge</button>
+            <div class="mh">Around the city</div>
+            <button class="mi" id="bVentures">JB Ventures <kbd>2</kbd></button>
+            <button class="mi" id="bNews">Newsroom <kbd>3</kbd></button>
+            <button class="mi" id="bCareer">Careers <kbd>4</kbd></button>
+            <button class="mi" id="bStudy">Study Hall <kbd>5</kbd></button>
+            <button class="mi" id="bCityHall">City Hall <kbd>6</kbd></button>
+            <button class="mi" id="bCity">Whole city <kbd>7</kbd></button>
+            <button class="mi" id="bIncubator">JB Incubator <kbd>8</kbd></button>
+            <button class="mi" id="bOps">Ops Center <kbd>9</kbd></button>
+            <button class="mi" id="bWire">The Wire (sky bridge)</button>
+            <button class="mi" data-math="1">Mental Math Arena</button>
+            <button class="mi" data-arena="1">Beat the Bots (market calls)</button>
+            <button class="mi" data-announce="1">📣 Floor announcement</button>
+            <button class="mi" data-team="1">👥 Manage the team</button>
+            <button class="mi" data-cio="1">CIO console</button>
+            <button class="mi" data-away="1">While you were away</button>
+            <button class="mi" data-trophies="1">Trophy case</button>
+            <button class="mi" data-mydesk="1">Your desk: place a trade</button>
+            <button class="mi" data-mlab="1">Model Lab (Kai)</button>
+            <button class="mi" data-builder="1">Strategy Builder</button>
+            <button class="mi" data-mm="1">Market Making Pit (interview game)</button>
+            <button class="mi" data-tear="1">Fund tear sheet</button>
+            <button class="mi" data-riskrep="1">Risk report (VaR)</button>
+            <button class="mi" data-compliance="1">Compliance</button>
+            <button class="mi" data-reports="1">Reports &amp; investor statement</button>
+            <button class="mi" data-experiment="1">📈 Experiment update (LinkedIn)</button>
+            <button class="mi" data-payoff="1">Opal's options payoff</button>
+            <button class="mi" data-stress="1">Stress test the book</button>
+          </div></div>
+        <button class="btn" id="bOverview" title="Back to the trading floor (H)">Overview</button>
+        <button class="btn" id="bFollow" title="Follow an agent (Tab: next agent)">Follow: off</button>
+        <button class="btn" id="bSettings">CIO desk</button>
+        <button class="btn" id="bLab">R&amp;D lab</button>
+        <button class="btn" id="bCharts">Charts</button>
+        <button class="btn" id="bDemo">Demo</button>
+        <button class="btn" id="bWalk" title="Walk around as yourself, or fly the drone camera (C)">&#128694; Walk</button>
+        <button class="btn" id="bGame" title="Full-screen game view (G)">&#9974; Game mode</button>
+        <button class="btn" id="bHelp" title="All controls (?)">?</button>
+        <button class="btn" id="bSound" title="Sound effects">&#128263;</button>
+      </div>
+      <div id="gKpi" class="gonly"><span>NAV<b id="gNav">—</b></span><span>Today<b id="gDay">—</b></span><span>AUM<b id="gAum">—</b></span><span class="dot" id="gDot"></span></div>
+      <div id="gFeed" class="gonly"></div>
+      <div id="gCard"></div>
+      <div id="gStrip" class="gonly" aria-label="Agents in this building"></div>
+      <div id="tourCap" aria-live="polite"><div id="tourT"></div><div id="tourS"></div><div class="tourHint">Esc or click to stop</div></div>
+      <div id="gRoundsBox" class="gonly"><button id="gRounds" title="Today's rounds on the floor"><span id="gRoundsTxt">Daily rounds</span><span class="bar"><i id="gRoundsBar" style="width:0%"></i></span></button><div id="gRoundsList" hidden></div></div>
+      <div id="gToasts"></div>
+      <button id="gPrompt" title="Interact (E)"><kbd>E</kbd><span id="gPromptTxt"></span></button>
+      <div id="travel" hidden role="menu"><h4>Elevator · where to?</h4>
+        <button class="btn" data-tr="fund">JB Capital <kbd>1</kbd></button><button class="btn" data-tr="studio">JB Ventures <kbd>2</kbd></button>
+        <button class="btn" data-tr="news">Newsroom <kbd>3</kbd></button><button class="btn" data-tr="career">Careers <kbd>4</kbd></button>
+        <button class="btn" data-tr="study">Study Hall <kbd>5</kbd></button><button class="btn" data-tr="cityhall">City Hall (fly) <kbd>6</kbd></button>
+        <button class="btn" data-tr="city">Whole city (fly) <kbd>7</kbd></button><button class="btn" data-tr="incubator">JB Incubator <kbd>8</kbd></button><button class="btn" data-tr="ops">Ops Center <kbd>9</kbd></button><button class="btn" data-tr="close">Stay here <kbd>Esc</kbd></button></div>
+      <div id="help" hidden><div class="win" role="dialog" aria-label="Controls">
+        <div style="display:flex;justify-content:space-between;align-items:center"><h2>How to get around</h2><button class="btn sm" id="helpX">Close</button></div>
+        <h4>Walk mode (you're the gold robot) · press C to switch</h4><table><tbody>
+          <tr><td>W A S D / arrows</td><td>walk · hold <b>Shift</b> to run · <b>Space</b> hop</td></tr>
+          <tr><td>Drag / scroll</td><td>look around / zoom (the camera stays behind you)</td></tr>
+          <tr><td>Click the floor</td><td>walk there (even across the sky bridges)</td></tr>
+          <tr><td>Click a robot · Tab</td><td>walk over and talk · Tab = next agent in this building</td></tr>
+          <tr><td>E</td><td>talk / use what's in front of you (desks, video wall, lab, elevator, coffee)</td></tr>
+          <tr><td>1 – 5, 8, 9</td><td>fast travel: 1 JB Capital · 2 Ventures · 3 Newsroom · 4 Careers · 5 Study Hall · 8 Incubator · 9 Ops Center</td></tr>
+          <tr><td>6 · 7</td><td>fly the drone to City Hall · the whole city</td></tr>
+          <tr><td>Daily rounds</td><td>talk to every PM, Rex and the CIO, visit the lab, read the video wall</td></tr></tbody></table>
+        <h4>Drone camera · mouse</h4><table><tbody>
+          <tr><td>Drag</td><td>slide around the floor (like a map)</td></tr>
+          <tr><td>Right-drag</td><td>turn and tilt the camera (keeps following an agent)</td></tr>
+          <tr><td>Scroll</td><td>zoom toward the mouse</td></tr>
+          <tr><td>Double-click</td><td>fly to that spot</td></tr>
+          <tr><td>Click a robot</td><td>follow it and see what it's doing</td></tr></tbody></table>
+        <h4>Drone camera · keyboard</h4><table><tbody>
+          <tr><td>W A S D / arrows</td><td>move · <b>Q / E</b> turn · <b>R / F</b> zoom · hold <b>Shift</b> for speed</td></tr>
+          <tr><td>Tab / Shift+Tab</td><td>next / previous agent in this building</td></tr>
+          <tr><td>Space</td><td>follow on / off</td></tr>
+          <tr><td>1 – 9</td><td>1 trading floor · 2 Ventures · 3 Newsroom · 4 Careers · 5 Study Hall · 6 City Hall · 7 whole city · 8 Incubator · 9 Ops Center</td></tr>
+          <tr><td>H</td><td>back to the trading floor</td></tr>
+          <tr><td>G</td><td>game mode: the 3D floor fills the screen</td></tr>
+          <tr><td>C</td><td>switch between walking and the drone camera</td></tr>
+          <tr><td>Walking</td><td><b>W A S D</b> walk (no click-to-walk) · <b>Shift</b> run · <b>E</b> talk / use · <b>Space</b> jump · <b>scroll</b> zoom (the camera never goes through walls)</td></tr>
+          <tr><td>V</td><td>first person while walking · drag to look, double-click to lock the mouse (Esc frees it)</td></tr>
+          <tr><td>Esc</td><td>close a panel · stop following · leave game mode</td></tr></tbody></table>
+        <h4>Also</h4><table><tbody><tr><td>Go to &#9662;</td><td>jump to any room or building · &#9654; City tour (a cinematic fly-through)</td></tr><tr><td>Mini-map</td><td>click a building to go there</td></tr><tr><td>Games</td><td>Mental Math Arena (cabinet in the Study Hall) · Beat the Bots (kiosk in the fund lounge) · daily rounds</td></tr><tr><td>&#128263; button</td><td>sound cues on / off (fills, wins, hires, fireworks)</td></tr></tbody></table>
+      </div></div>
+      <div id="overlay"></div><div id="tip"></div>
+      <div id="navpad" aria-label="Camera controls">
+        <button data-nav="q" title="Turn left (Q)">&#10226;</button><button data-nav="w" title="Move forward (W / up arrow)">&#9650;</button><button data-nav="e" title="Turn right (E)">&#10227;</button>
+        <button data-nav="a" title="Move left (A / left arrow)">&#9664;</button><button data-nav="home" title="Reset view">&#8962;</button><button data-nav="d" title="Move right (D / right arrow)">&#9654;</button>
+        <button data-nav="r" title="Zoom in (scroll / R)">+</button><button data-nav="s" title="Move back (S / down arrow)">&#9660;</button><button data-nav="f" title="Zoom out (scroll / F)">&minus;</button>
+      </div>
+      <button id="compass" title="Face north"><span id="needle">N</span></button>
+      <canvas id="minimap" width="440" height="240" title="Map: click to go there"></canvas>
+      <div id="hint"><span><b>Drag</b> move · <b>right-drag</b> turn · <b>scroll</b> zoom · <b>Tab</b> next agent · <b>G</b> game mode · <b>?</b> help</span><button id="hintX" title="Hide">&times;</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="panelhead"><span>JB Capital · terminal</span><button class="btn sm" id="panelX" title="Close (Esc)">&#10005; Close</button></div>
+    <div class="tabs" id="tabs">
+      <div class="tab on" data-p="feed">Feed</div><div class="tab" data-p="pods">Pods</div><div class="tab" data-p="team">Team</div><div class="tab" data-p="riskp">Risk</div>
+      <div class="tab" data-p="research">R&amp;D</div><div class="tab" data-p="letters">Letters</div><div class="tab" data-p="ventures">Ventures</div><div class="tab" data-p="newsp">News</div><div class="tab" data-p="careerp">Career</div><div class="tab" data-p="studyp">Study</div><div class="tab" data-p="wire">Wire</div>
+    </div>
+    <div class="pane on feed" id="feed"></div>
+    <div class="pane" id="pods"></div><div class="pane" id="team"></div>
+    <div class="pane" id="riskp"></div>
+    <div class="pane" id="research"></div>
+    <div class="pane" id="letters"></div>
+    <div class="pane" id="ventures"></div>
+    <div class="pane" id="wire"></div>
+    <div class="pane" id="newsp"></div>
+    <div class="pane" id="careerp"></div>
+    <div class="pane" id="studyp"></div>
+  </div>
+</div>
+
+<div class="lower">
+  <div class="card"><div class="head"><h3>NAV per unit</h3><span class="muted" id="navInfo"></span></div><div id="navChart"></div></div>
+  <div class="card"><div class="head"><h3>Open positions</h3><span class="muted" id="posInfo"></span></div>
+    <div class="body" style="padding:0 6px 8px"><table><thead><tr><th>Pod</th><th>Sym</th><th>Side</th><th>Entry</th><th>Last</th><th>P&amp;L</th></tr></thead><tbody id="pos"></tbody></table></div></div>
+  <div class="card"><div class="head"><h3>Recent trades</h3><span class="muted" id="trInfo"></span></div>
+    <div class="body" style="padding:0 6px 8px"><table><thead><tr><th>Pod</th><th>Sym</th><th>P&amp;L</th><th>Exit</th></tr></thead><tbody id="trades"></tbody></table></div></div>
+</div>
+
+<div id="modal"><div class="win" id="win"></div></div>
+<div id="fade"></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="/static/game3d.js"></script>
+</body>
+</html>

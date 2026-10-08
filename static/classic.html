@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JB Capital — Trading Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14111f; --panel: #221d33; --panel2: #2c2542; --line: #4b3f72; --ink: #f4ecd8;
+    --dim: #a99fc4; --gold: #ffcf4a; --green: #5ee27a; --red: #ff5a6a; --blue: #5ab8ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'VT323', monospace; font-size: 20px; }
+  .px { font-family: 'Press Start 2P', monospace; }
+  header { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 12px; background: var(--panel); border-bottom: 4px solid var(--line); }
+  .logo { font-family: 'Press Start 2P'; font-size: 14px; color: var(--gold); text-shadow: 2px 2px 0 #7a4b00; margin-right: 8px; }
+  .stat { background: var(--panel2); border: 3px solid var(--line); padding: 3px 10px; min-width: 120px; }
+  .stat b { display: block; font-family: 'Press Start 2P'; font-size: 7px; color: var(--dim); margin-bottom: 3px; }
+  .stat span { font-size: 24px; }
+  .mk { font-family: 'Press Start 2P'; font-size: 7px; padding: 5px 6px; border: 2px solid var(--line); }
+  .mk.open { color: var(--green); border-color: var(--green); } .mk.closed { color: var(--dim); }
+  .up { color: var(--green); } .down { color: var(--red); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 10px; padding: 10px; }
+  #stage { position: relative; background: #000; border: 4px solid var(--line); }
+  #game { width: 100%; display: block; image-rendering: pixelated; cursor: pointer; }
+  aside { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .box { background: var(--panel); border: 4px solid var(--line); padding: 8px; }
+  .box h3 { font-family: 'Press Start 2P'; font-size: 9px; margin: 0 0 8px; color: var(--gold); }
+  #log { height: 330px; overflow-y: auto; font-size: 18px; line-height: 1.15; }
+  #log div { padding: 2px 0; border-bottom: 1px dashed #3a3156; }
+  #log .who { font-family: 'Press Start 2P'; font-size: 7px; }
+  #card { min-height: 150px; font-size: 18px; }
+  .bar { height: 8px; background: #3a3156; margin: 2px 0 6px; }
+  .bar i { display: block; height: 100%; }
+  .bottom { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; padding: 0 10px 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 18px; }
+  th { font-family: 'Press Start 2P'; font-size: 7px; color: var(--dim); text-align: left; padding: 4px; border-bottom: 2px solid var(--line); }
+  td { padding: 3px 4px; border-bottom: 1px dashed #3a3156; }
+  #spark { width: 100%; height: 110px; image-rendering: pixelated; }
+  .roster { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 17px; }
+  .muted { color: var(--dim); }
+  @media (max-width: 1000px) { main, .bottom { grid-template-columns: 1fr; } #log { height: 220px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">JB CAPITAL</div>
+  <div class="stat"><b>EQUITY</b><span id="equity">$—</span></div>
+  <div class="stat"><b>TOTAL P&amp;L</b><span id="total">—</span></div>
+  <div class="stat"><b>TODAY</b><span id="today">—</span></div>
+  <div class="stat"><b>OPEN RISK</b><span id="risk">—</span></div>
+  <div class="stat"><b>FEES PAID</b><span id="fees">—</span></div>
+  <div id="mkts" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+  <div class="stat" style="margin-left:auto"><b>LINK</b><span id="conn" class="down">offline</span></div>
+</header>
+<main>
+  <div id="stage"><canvas id="game" width="1280" height="720"></canvas></div>
+  <aside>
+    <div class="box"><h3>FLOOR CHATTER</h3><div id="log"></div></div>
+    <div class="box"><h3 id="cardTitle">CLICK AN AGENT</h3><div id="card" class="muted">Click anyone on the floor to see their stats.</div></div>
+  </aside>
+</main>
+<div class="bottom">
+  <div class="box"><h3>OPEN POSITIONS</h3>
+    <table><thead><tr><th>SYM</th><th>SIDE</th><th>QTY</th><th>ENTRY</th><th>LAST</th><th>STOP</th><th>P&amp;L</th></tr></thead><tbody id="pos"></tbody></table>
+    <h3 style="margin-top:12px">LAST TRADES</h3>
+    <table><tbody id="trades"></tbody></table>
+  </div>
+  <div class="box"><h3>EQUITY CURVE</h3><canvas id="spark" width="400" height="110"></canvas>
+    <div id="headline" class="muted" style="margin-top:6px"></div></div>
+  <div class="box"><h3>SKILL BOARD</h3><div class="roster" id="roster"></div>
+    <div class="muted" style="font-size:16px;margin-top:6px">Sam grades every call 1h later. Trust = how much the Boss listens. Earned, not given.</div></div>
+</div>
+<script src="/static/classic.js"></script>
+</body>
+</html>

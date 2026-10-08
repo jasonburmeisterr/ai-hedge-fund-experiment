@@ -1,0 +1,8 @@
+state.json
+state.json.tmp
+.env
+__pycache__/
+data_cache/
+logs/
+career_reports/
+*.pyc
