@@ -1,5 +1,5 @@
 # The AI Hedge Fund Experiment
-
+##     THIS WAS INSPIRED NOT MY ORIGINAL IDEA 
 **What if a hedge fund was run entirely by AI agents that have to work together?**
 
 JB Capital is an experiment by Jason Burmeister (18, first-year finance student) to find out whether a team of AI agents,
